@@ -1,0 +1,228 @@
+Sub Replace_Word_From_Excel()
+
+'Darius Jelen, 06/24/2019'
+'Replace info from Excel Sheet to Word Document.
+'Sends all unused labels to .txt for review
+'saves file as Output + time of finished report
+'Counts excel files in folder
+
+'Index
+Dim IndexRow, MaxRow, IndexCol, MaxCol As Integer
+Dim IndexCell, LabelRow As String
+
+'Word
+Dim ws As Worksheet
+Dim msWord As Object
+
+'Output Nonreplacement cells to .txt
+Dim fso As Object
+Dim FileOut As Object
+
+'Finds Text
+Dim TextTag1 As String
+
+'SPUDoutput+date
+Dim DateStr, FileStr As String
+DateStr = Format(Now(), "hh-mm-ss-AMPM")
+FileStr = "Output-" & DateStr & ".docx"
+
+'Report declarations
+Dim Path1 As Variant
+Dim s As Integer
+Dim FSOFolder As Object
+
+Dim MyFile As String
+Dim Counter As Integer
+
+'dynamic array variable
+Dim Reporter(1 To 6) As Variant
+
+Reporter(1) = "file1"
+Reporter(2) = "file2"
+Reporter(3) = "file3"
+Reporter(4) = "file4"
+Reporter(5) = "file5"
+Reporter(6) = "file6"
+'--------------------------------------------------------------
+
+
+'For the "continue?" prompts
+Dim Sad As Integer
+Dim Happy As Integer     '-
+Dim strPrompt As String
+Dim strPrompt2 As String '-
+Dim strTitle As String
+Dim strTitle2 As String  '-
+strTitle = "Files Missing"
+strTitle2 = "Blank Cells"
+strPrompt = "Files are missing. Continue?"
+strPrompt2 = "There are blank cells. Continue?"
+
+'For the list
+Dim Table As Range
+Dim Replacements As Integer
+Dim NonReplacements As Integer
+
+Application.ScreenUpdating = False
+
+'Declare variables
+Set fso = CreateObject("Scripting.FileSystemObject")
+Set FileOut = fso.CreateTextFile("C:\users\username\documents\unassigned.txt", True, True)
+'Set FSOFolder = FSOLibrary.GetFolder(ProtoFolder)
+'Set FSOfile = FSOFolder.Files
+
+'Excel files to pull from
+file1= VBA.FileSystem.Dir("C:\users\username\documents\file1")
+file2= VBA.FileSystem.Dir("C:\users\username\documents\file2")
+file3= VBA.FileSystem.Dir("C:\users\username\documents\file3")
+file4= VBA.FileSystem.Dir("C:\users\username\documents\file4")
+file5= VBA.FileSystem.Dir("C:\users\username\documents\file5")
+file6= VBA.FileSystem.Dir("C:\users\username\documents\file6")
+
+
+'Declare directory path for check (the 6 report excel files)
+Protofile = Dir("C:\users\username\documents\*.xlsx, *xls")
+
+'Checks folder for reports  **add missing file names
+For Each Protofile In Reporter
+    Counter = Counter + 1
+    'If Reporter = "" Then
+    '    FileOut.Open
+    '    FileOut.WriteLine (Reporter)
+    'Else
+    'End If
+Next
+    
+    strPrompt = Counter & "/x files found. Continue?"		'change '/x' to amt of files
+    Sad = MsgBox(strPrompt, vbYesNo, strTitle)
+    If Sad = vbNo Then
+        Exit Sub
+    Else
+    End If
+'-----------------------------------------------------------------
+
+
+'Creates new .docx with the respective placeholders filled in'
+Set ws = ActiveSheet
+TextTag1 = "//"
+Set msWord = CreateObject("Word.Application")
+
+'constants
+    IndexRow = 2        'Which row is indexed
+    MaxRow = Cells.Find(What:="*", SearchDirection:=xlPrevious).Row      'Highest Row #
+    LabelRow = 1
+
+    IndexCol = 1        'Which column is indexed
+    MaxCol = Cells.Find(What:="*", SearchDirection:=xlPrevious).Column  'Highest Column #
+    Replacements = 0
+    NonReplacements = 0
+    
+
+
+'Count number of blank cells
+Set Table = Range(Cells(IndexRow, IndexCol), Cells(MaxRow, MaxCol))
+BlankCount = Table.Cells.Count - WorksheetFunction.CountA(Table)
+
+'Report the number of blank cells       'Change Else so user can cancel 'Move to end of macro
+If BlankCount = 0 Then
+MsgBox "There are no blank cells. Click OK to proceed."
+Else
+MsgBox "The total blank cells is " & BlankCount & ". Check to make sure this was on purpose."
+End If
+strPrompt2 = BlankCount & " blank cells were found. Would you like to continue?"
+    Happy = MsgBox(strPrompt2, vbYesNo, strTitle2)
+    If Happy = vbNo Then
+        Exit Sub
+    Else
+    End If
+
+'Directory to .docx
+MsgBox "Choose a Word document after pressing 'OK'."
+With msWord
+    With Application.FileDialog(msoFileDialogFilePicker)
+        .AllowMultiSelect = False
+        .Filters.Add "Word Document", "*.docx,*.docm", 1
+                              'Word and Macro-Enabled Word Docs
+        .Show
+    
+        file = .SelectedItems(1)
+    
+    End With
+    
+    .Visible = True
+    .Documents.Open file
+
+    
+    IndexCell = IndexCol & "," & IndexRow
+    Cells(IndexRow, IndexCol).Select
+    
+    'Start search/Replace
+    Do While IndexRow < 3
+        'For initial report, we only process row 2.
+        Do While IndexCol <= MaxCol
+            FindText = TextTag1 & Cells(LabelRow, IndexCol).Value & TextTag1
+            
+With .ActiveDocument.Content.Find       'Word Replacement
+        .ClearFormatting
+        .Replacement.ClearFormatting
+        
+        .Text = FindText                'Original line
+            If .Execute Then
+                .Replacement.Text = Cells(IndexRow, IndexCol).Value
+                Replacements = Replacements + 1
+            Else
+                .Replacement.Text = Cells(IndexRow, IndexCol).Value
+                 NonReplacements = NonReplacements + 1
+                    FileOut.WriteLine (" " + FindText)
+                        '^This adds the unassigned label to the "FailedList" One line at a time (Loops)
+                
+      '          Selection.FindText.Copy
+      '              Sheets("NotReplaced").Select
+      '          ActiveSheet.Paste
+                
+        .Replacement.Text = Cells(IndexRow, IndexCol).Value     'Original line
+            End If
+            
+        .Forward = True
+        .Wrap = 1
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+
+        .Execute Replace:=2
+    
+    End With
+        
+        IndexCol = IndexCol + 1
+        
+        Loop
+        
+        IndexCol = 1
+    
+    IndexRow = IndexRow + 1
+    
+    Loop
+
+FileOut.Close
+
+
+MsgBox "Total replacements submitted is " & Replacements & ". " & NonReplacements & " labels are unassigned. Check 'UnusedLabels.txt'"
+
+    With .ActiveDocument
+    .SaveAs "C:\users\username\documents\" & FileStr, _
+            FileFormat:=wdFormatXMLDocument
+    
+    End With
+    
+'.Quit SaveChanges:=False
+        '^ True = closes the new version of .docx file automatically
+
+End With
+
+Application.ScreenUpdating = True
+
+End Sub
+
